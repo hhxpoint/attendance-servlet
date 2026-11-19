@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>职工考勤管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="main-wrapper">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-text">📋 考勤管理</div>
+                <div class="logo-sub">Attendance System</div>
+            </div>
+            <div class="nav-menu">
+                <div class="nav-group">
+                    <div class="nav-group-title">主要功能</div>
+                    <a class="nav-item active" onclick="loadPage('dashboard')">
+                        <span class="nav-icon">🏠</span>
+                        <span class="nav-text">系统首页</span>
+                    </a>
+                    <a class="nav-item" onclick="loadPage('clock')">
+                        <span class="nav-icon">⏰</span>
+                        <span class="nav-text">打卡签到</span>
+                    </a>
+                    <a class="nav-item" onclick="loadPage('attendance')">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">考勤记录</span>
+                    </a>
+                    <a class="nav-item" onclick="loadPage('leave')">
+                        <span class="nav-icon">📝</span>
+                        <span class="nav-text">请假管理</span>
+                    </a>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-title">系统管理</div>
+                    <a class="nav-item" onclick="loadPage('user')">
+                        <span class="nav-icon">👥</span>
+                        <span class="nav-text">员工管理</span>
+                    </a>
+                    <a class="nav-item" onclick="loadPage('dept')">
+                        <span class="nav-icon">🏢</span>
+                        <span class="nav-text">部门管理</span>
+                    </a>
+                    <a class="nav-item" onclick="loadPage('announcement')">
+                        <span class="nav-icon">📢</span>
+                        <span class="nav-text">公告通知</span>
+                    </a>
+                    <a class="nav-item" onclick="loadPage('statistics')">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">统计分析</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容 -->
+        <div class="content-wrapper">
+            <!-- 顶部栏 -->
+            <div class="topbar">
+                <div class="topbar-left">
+                    <div class="breadcrumb">首页 / <span id="currentPageName">系统首页</span></div>
+                </div>
+                <div class="topbar-right">
+                    <div class="time-display" id="currentTime"></div>
+                    <div class="user-info" id="userInfo">
+                        <div class="avatar" id="userAvatar">A</div>
+                        <span class="username" id="userName">管理员</span>
+                        <span class="role-tag" id="userRole">管理员</span>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">退出</button>
+                </div>
+            </div>
+
+            <!-- 页面内容 -->
+            <div class="page-content" id="pageContent">
+                <!-- 动态加载 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script>
+        // 页面映射
+        const pageMap = {
+            'dashboard': '系统首页',
+            'clock': '打卡签到',
+            'attendance': '考勤记录',
+            'leave': '请假管理',
+            'user': '员工管理',
+            'dept': '部门管理',
+            'announcement': '公告通知',
+            'statistics': '统计分析'
+        };
+
+        // 初始化
+        window.onload = function() {
+            const user = getCurrentUser();
+            if (!user) {
+                window.location.href = '../login.html';
+                return;
+            }
+            // 显示用户信息
+            document.getElementById('userName').textContent = user.realName || user.username;
+            document.getElementById('userAvatar').textContent = (user.realName || user.username).charAt(0);
+            document.getElementById('userRole').textContent = getRoleText(user.role);
+            
+            updateTime();
+            setInterval(updateTime, 1000);
+            loadPage('dashboard');
+        };
+
+        // 更新时间
+        function updateTime() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth()+1).padStart(2,'0');
+            const d = String(now.getDate()).padStart(2,'0');
+            const h = String(now.getHours()).padStart(2,'0');
+            const min = String(now.getMinutes()).padStart(2,'0');
+            const s = String(now.getSeconds()).padStart(2,'0');
+            const weeks = ['日','一','二','三','四','五','六'];
+            document.getElementById('currentTime').textContent = 
+                `${y}-${m}-${d} 星期${weeks[now.getDay()]} ${h}:${min}:${s}`;
+        }
+
+        // 加载页面
+        function loadPage(pageName) {
+            // 更新导航高亮
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.target.closest('.nav-item').classList.add('active');
+            document.getElementById('currentPageName').textContent = pageMap[pageName] || pageName;
+            
+            const content = document.getElementById('pageContent');
+            
+            switch(pageName) {
+                case 'dashboard': renderDashboard(content); break;
+                case 'clock': renderClockPage(content); break;
+                case 'attendance': renderAttendancePage(content); break;
+                case 'leave': renderLeavePage(content); break;
+                case 'user': renderUserPage(content); break;
+                case 'dept': renderDeptPage(content); break;
+                case 'announcement': renderAnnouncementPage(content); break;
+                case 'statistics': renderStatisticsPage(content); break;
+            }
+        }
+
+        // ===== 仪表盘 =====
+        function renderDashboard(container) {
+            const user = getCurrentUser();
+            container.innerHTML = `
+                <h2 class="page-title">欢迎回来，${user.realName || user.username}！</h2>
+                <p class="page-desc">这是您的考勤管理系统概览</p>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">📅</div>
+                        <div class="stat-info">
+                            <h4 id="todayDate">${formatDate(new Date())}</h4>
+                            <p>今日日期</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">✅</div>
+                        <div class="stat-info">
+                            <h4 id="statNormal">-</h4>
+                            <p>本月正常出勤</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">⏰</div>
+                        <div class="stat-info">
+                            <h4 id="statLate">-</h4>
+                            <p>本月迟到次数</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon red">📝</div>
+                        <div class="stat-info">
+                            <h4 id="statLeave">-</h4>
+                            <p>待审批请假</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📋 今日考勤状态</h3>
+                        </div>
+                        <div class="card-body" id="todayStatus">
+                            <p style="color:#999;text-align:center;padding:20px;">加载中...</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📢 最新公告</h3>
+                        </div>
+                        <div class="card-body" id="latestAnnouncements">
+                            <p style="color:#999;text-align:center;padding:20px;">加载中...</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 加载今日考勤
+            apiGet('/attendance/today').then(res => {
+                const el = document.getElementById('todayStatus');
+                if (res.code === 200 && res.data) {
+                    const a = res.data;
+                    el.innerHTML = `
+                        <div style="display:flex;justify-content:space-around;text-align:center;">
+                            <div>
+                                <div style="font-size:24px;font-weight:600;color:#27ae60;">${a.clockInTime ? formatTime(a.clockInTime) : '--:--'}</div>
+                                <div style="font-size:12px;color:#999;margin-top:4px;">上班打卡</div>
+                            </div>
+                            <div>
+                                <div style="font-size:24px;font-weight:600;color:#e67e22;">${a.clockOutTime ? formatTime(a.clockOutTime) : '--:--'}</div>
+                                <div style="font-size:12px;color:#999;margin-top:4px;">下班打卡</div>
+                            </div>
+                            <div>
+                                ${getAttendStatusText(a.status)}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    el.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">今日尚未打卡</p>';
+                }
+            });
+            
+            // 加载公告
+            apiGet('/announcement/list').then(res => {
+                const el = document.getElementById('latestAnnouncements');
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    el.innerHTML = res.data.slice(0, 5).map(a => `
+                        <div style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
+                            <span style="font-weight:500;">${a.title}</span>
+                            <span style="float:right;font-size:12px;color:#999;">${formatDate(a.createTime)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    el.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">暂无公告</p>';
+                }
+            });
+        }
+
+        // ===== 打卡页面 =====
+        function renderClockPage(container) {
+            container.innerHTML = `
+                <h2 class="page-title">打卡签到</h2>
+                <p class="page-desc">请在规定时间内完成打卡</p>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <div style="text-align:center;margin-bottom:20px;">
+                            <div style="font-size:48px;font-weight:700;color:#1a1a2e;" id="clockTime">--:--:--</div>
+                            <div style="color:#999;margin-top:8px;" id="clockDate"></div>
+                        </div>
+                        
+                        <div class="clock-container">
+                            <button class="clock-btn clock-in" onclick="doClockIn()" id="clockInBtn">
+                                <span class="clock-icon">👆</span>
+                                <span>上班打卡</span>
+                                <span style="font-size:12px;opacity:0.8;">09:00</span>
+                            </button>
+                            <button class="clock-btn clock-out" onclick="doClockOut()" id="clockOutBtn">
+                                <span class="clock-icon">👇</span>
+                                <span>下班打卡</span>
+                                <span style="font-size:12px;opacity:0.8;">18:00</span>
+                            </button>
+                        </div>
+                        
+                        <div class="clock-status" id="clockStatus">加载中...</div>
+                    </div>
+                </div>
+            `;
+            
+            // 更新时钟
+            function updateClock() {
+                const now = new Date();
+                const h = String(now.getHours()).padStart(2,'0');
+                const m = String(now.getMinutes()).padStart(2,'0');
+                const s = String(now.getSeconds()).padStart(2,'0');
+                document.getElementById('clockTime').textContent = `${h}:${m}:${s}`;
+                const weeks = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+                document.getElementById('clockDate').textContent = 
+                    `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${weeks[now.getDay()]}`;
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+            
+            // 加载今日状态
+            apiGet('/attendance/today').then(res => {
+                const status = document.getElementById('clockStatus');
+                const inBtn = document.getElementById('clockInBtn');
+                const outBtn = document.getElementById('clockOutBtn');
+                
+                if (res.code === 200 && res.data) {
+                    const a = res.data;
+                    if (a.clockInTime) {
+                        inBtn.disabled = true;
+                        inBtn.innerHTML = `<span class="clock-icon">✅</span><span>已打卡</span><span style="font-size:12px;">${formatTime(a.clockInTime)}</span>`;
+                    }
+                    if (a.clockOutTime) {
+                        outBtn.disabled = true;
+                        outBtn.innerHTML = `<span class="clock-icon">✅</span><span>已打卡</span><span style="font-size:12px;">${formatTime(a.clockOutTime)}</span>`;
+                    }
+                    status.innerHTML = `今日状态：${getAttendStatusText(a.status)}`;
+                } else {
+                    status.innerHTML = '今日尚未打卡，请及时打卡';
+                }
+            });
+        }
+        
+        function doClockIn() {
+            apiPost('/attendance/clockIn').then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) renderClockPage(document.getElementById('pageContent'));
+            });
+        }
+        
+        function doClockOut() {
+            apiPost('/attendance/clockOut').then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) renderClockPage(document.getElementById('pageContent'));
+            });
+        }
+
+        // ===== 考勤记录页面 =====
+        function renderAttendancePage(container) {
+            container.innerHTML = `
+                <h2 class="page-title">考勤记录</h2>
+                <p class="page-desc">查看和管理员工考勤数据</p>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>考勤列表</h3>
+                        <div class="btn-group">
+                            <button class="btn btn-outline btn-sm" onclick="loadAttendanceData()">🔄 刷新</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="search-bar">
+                            <div class="search-item">
+                                <label>开始日期</label>
+                                <input type="date" id="attStartDate">
+                            </div>
+                            <div class="search-item">
+                                <label>结束日期</label>
+                                <input type="date" id="attEndDate">
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="loadAttendanceData()">查询</button>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>序号</th>
+                                        <th>姓名</th>
+                                        <th>部门</th>
+                                        <th>日期</th>
+                                        <th>上班打卡</th>
+                                        <th>下班打卡</th>
+                                        <th>状态</th>
+                                        <th>迟到(分)</th>
+                                        <th>早退(分)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendanceTableBody">
+                                    <tr><td colspan="9" class="empty-state"><p>加载中...</p></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            loadAttendanceData();
+        }
+        
+        function loadAttendanceData() {
+            let url = '/attendance/list';
+            const start = document.getElementById('attStartDate')?.value;
+            const end = document.getElementById('attEndDate')?.value;
+            if (start && end) url += `?startDate=${start}&endDate=${end}`;
+            
+            apiGet(url).then(res => {
+                const tbody = document.getElementById('attendanceTableBody');
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    tbody.innerHTML = res.data.map((a, i) => `
+                        <tr>
+                            <td>${i+1}</td>
+                            <td>${a.realName || '-'}</td>
+                            <td>${a.deptName || '-'}</td>
+                            <td>${formatDate(a.attendDate)}</td>
+                            <td>${a.clockInTime ? formatTime(a.clockInTime) : '-'}</td>
+                            <td>${a.clockOutTime ? formatTime(a.clockOutTime) : '-'}</td>
+                            <td>${getAttendStatusText(a.status)}</td>
+                            <td>${a.lateMinutes || 0}</td>
+                            <td>${a.earlyMinutes || 0}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📭</div><p>暂无考勤记录</p></div></td></tr>';
+                }
+            });
+        }
+
+        // ===== 请假管理页面 =====
+        function renderLeavePage(container) {
+            const user = getCurrentUser();
+            const canApprove = user.role >= 2;
+            
+            container.innerHTML = `
+                <h2 class="page-title">请假管理</h2>
+                <p class="page-desc">提交和管理请假申请</p>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>请假列表</h3>
+                        <div class="btn-group">
+                            <button class="btn btn-primary btn-sm" onclick="showLeaveModal()">+ 提交请假</button>
+                            ${canApprove ? '<button class="btn btn-warning btn-sm" onclick="loadLeaveData(\'pending\')">📋 待审批</button>' : ''}
+                            <button class="btn btn-outline btn-sm" onclick="loadLeaveData()">全部</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>序号</th>
+                                        <th>申请人</th>
+                                        <th>请假类型</th>
+                                        <th>开始时间</th>
+                                        <th>结束时间</th>
+                                        <th>天数</th>
+                                        <th>原因</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leaveTableBody">
+                                    <tr><td colspan="9"><div class="empty-state"><p>加载中...</p></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 请假申请模态框 -->
+                <div class="modal-overlay" id="leaveModal">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3>提交请假申请</h3>
+                            <button class="modal-close" onclick="closeLeaveModal()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>请假类型 <span class="required">*</span></label>
+                                    <select id="leaveType">
+                                        <option value="1">事假</option>
+                                        <option value="2">病假</option>
+                                        <option value="3">年假</option>
+                                        <option value="4">婚假</option>
+                                        <option value="5">产假</option>
+                                        <option value="6">其他</option>
+                                    </select>
+                                </div>
+                                <div class="form-item">
+                                    <label>请假天数 <span class="required">*</span></label>
+                                    <input type="number" id="leaveDays" step="0.5" min="0.5" placeholder="请输入天数">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>开始时间 <span class="required">*</span></label>
+                                    <input type="datetime-local" id="leaveStart">
+                                </div>
+                                <div class="form-item">
+                                    <label>结束时间 <span class="required">*</span></label>
+                                    <input type="datetime-local" id="leaveEnd">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>请假原因 <span class="required">*</span></label>
+                                    <textarea id="leaveReason" placeholder="请详细说明请假原因"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-outline" onclick="closeLeaveModal()">取消</button>
+                            <button class="btn btn-primary" onclick="submitLeave()">提交申请</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 审批模态框 -->
+                <div class="modal-overlay" id="approveModal">
+                    <div class="modal" style="width:400px;">
+                        <div class="modal-header">
+                            <h3>审批请假</h3>
+                            <button class="modal-close" onclick="closeApproveModal()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-item" style="margin-bottom:16px;">
+                                <label>审批备注</label>
+                                <textarea id="approveRemark" placeholder="请输入审批意见（可选）"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-danger" onclick="doApprove(2)">驳回</button>
+                            <button class="btn btn-success" onclick="doApprove(1)">通过</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            loadLeaveData();
+        }
+        
+        let currentApproveId = null;
+        
+        function loadLeaveData(type) {
+            const url = type === 'pending' ? '/leave/pending' : '/leave/list';
+            apiGet(url).then(res => {
+                const tbody = document.getElementById('leaveTableBody');
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    tbody.innerHTML = res.data.map((l, i) => `
+                        <tr>
+                            <td>${i+1}</td>
+                            <td>${l.realName || '-'}</td>
+                            <td>${getLeaveTypeText(l.leaveType)}</td>
+                            <td>${formatDateTime(l.startTime)}</td>
+                            <td>${formatDateTime(l.endTime)}</td>
+                            <td>${l.days}</td>
+                            <td title="${l.reason}">${l.reason ? l.reason.substring(0,20) + (l.reason.length > 20 ? '...' : '') : '-'}</td>
+                            <td>${getLeaveStatusText(l.status)}</td>
+                            <td>
+                                ${l.status === 0 ? `<button class="btn btn-warning btn-sm" onclick="showApproveModal(${l.id})">审批</button>` : ''}
+                                ${l.status === 0 ? `<button class="btn btn-outline btn-sm" onclick="cancelLeave(${l.id})">撤销</button>` : ''}
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📭</div><p>暂无请假记录</p></div></td></tr>';
+                }
+            });
+        }
+        
+        function showLeaveModal() { document.getElementById('leaveModal').classList.add('show'); }
+        function closeLeaveModal() { document.getElementById('leaveModal').classList.remove('show'); }
+        
+        function showApproveModal(id) {
+            currentApproveId = id;
+            document.getElementById('approveModal').classList.add('show');
+        }
+        function closeApproveModal() {
+            document.getElementById('approveModal').classList.remove('show');
+            currentApproveId = null;
+        }
+        
+        function submitLeave() {
+            const data = {
+                leaveType: parseInt(document.getElementById('leaveType').value),
+                startTime: document.getElementById('leaveStart').value,
+                endTime: document.getElementById('leaveEnd').value,
+                days: parseFloat(document.getElementById('leaveDays').value),
+                reason: document.getElementById('leaveReason').value
+            };
+            if (!data.startTime || !data.endTime || !data.days || !data.reason) {
+                showMessage('请填写完整信息', 'warning');
+                return;
+            }
+            apiPost('/leave/apply', data).then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) {
+                    closeLeaveModal();
+                    loadLeaveData();
+                }
+            });
+        }
+        
+        function doApprove(status) {
+            if (!currentApproveId) return;
+            const remark = document.getElementById('approveRemark').value;
+            apiFormPost(`/leave/approve?id=${currentApproveId}&status=${status}&remark=${encodeURIComponent(remark)}`).then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) {
+                    closeApproveModal();
+                    loadLeaveData();
+                }
+            });
+        }
+        
+        function cancelLeave(id) {
+            if (!confirmAction('确定要撤销这条请假申请吗？')) return;
+            apiFormPost(`/leave/cancel?id=${id}`).then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) loadLeaveData();
+            });
+        }
+
+        // ===== 员工管理页面 =====
+        function renderUserPage(container) {
+            container.innerHTML = `
+                <h2 class="page-title">员工管理</h2>
+                <p class="page-desc">管理系统中的所有员工信息</p>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>员工列表</h3>
+                        <button class="btn btn-primary btn-sm" onclick="showUserModal()">+ 新增员工</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>序号</th>
+                                        <th>用户名</th>
+                                        <th>姓名</th>
+                                        <th>性别</th>
+                                        <th>部门</th>
+                                        <th>职位</th>
+                                        <th>角色</th>
+                                        <th>手机号</th>
+                                        <th>入职日期</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userTableBody">
+                                    <tr><td colspan="10"><div class="empty-state"><p>加载中...</p></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-overlay" id="userModal">
+                    <div class="modal" style="width:650px;">
+                        <div class="modal-header">
+                            <h3 id="userModalTitle">新增员工</h3>
+                            <button class="modal-close" onclick="closeUserModal()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" id="userId">
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>用户名 <span class="required">*</span></label>
+                                    <input type="text" id="userUsername" placeholder="登录用户名">
+                                </div>
+                                <div class="form-item">
+                                    <label>密码 <span class="required">*</span></label>
+                                    <input type="password" id="userPassword" placeholder="登录密码">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>真实姓名 <span class="required">*</span></label>
+                                    <input type="text" id="userRealName" placeholder="请输入真实姓名">
+                                </div>
+                                <div class="form-item">
+                                    <label>性别</label>
+                                    <select id="userGender">
+                                        <option value="1">男</option>
+                                        <option value="2">女</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>部门 <span class="required">*</span></label>
+                                    <select id="userDeptId"></select>
+                                </div>
+                                <div class="form-item">
+                                    <label>职位</label>
+                                    <input type="text" id="userPosition" placeholder="请输入职位">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>角色</label>
+                                    <select id="userRole">
+                                        <option value="1">普通员工</option>
+                                        <option value="2">部门经理</option>
+                                        <option value="3">管理员</option>
+                                    </select>
+                                </div>
+                                <div class="form-item">
+                                    <label>手机号</label>
+                                    <input type="text" id="userPhone" placeholder="请输入手机号">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>邮箱</label>
+                                    <input type="email" id="userEmail" placeholder="请输入邮箱">
+                                </div>
+                                <div class="form-item">
+                                    <label>入职日期</label>
+                                    <input type="date" id="userEntryDate">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-outline" onclick="closeUserModal()">取消</button>
+                            <button class="btn btn-primary" onclick="saveUser()">保存</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            loadUserData();
+            loadDeptOptions();
+        }
+        
+        function loadUserData() {
+            apiGet('/user/list').then(res => {
+                const tbody = document.getElementById('userTableBody');
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    tbody.innerHTML = res.data.map((u, i) => `
+                        <tr>
+                            <td>${i+1}</td>
+                            <td>${u.username}</td>
+                            <td>${u.realName}</td>
+                            <td>${u.gender === 1 ? '男' : '女'}</td>
+                            <td>${u.deptName || '-'}</td>
+                            <td>${u.position || '-'}</td>
+                            <td><span class="status-tag ${u.role === 3 ? 'status-danger' : u.role === 2 ? 'status-warning' : 'status-info'}">${getRoleText(u.role)}</span></td>
+                            <td>${u.phone || '-'}</td>
+                            <td>${formatDate(u.entryDate)}</td>
+                            <td>
+                                <button class="btn btn-outline btn-sm" onclick="editUser(${u.id})">编辑</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><p>暂无员工数据</p></div></td></tr>';
+                }
+            });
+        }
+        
+        function loadDeptOptions() {
+            apiGet('/dept/list').then(res => {
+                const select = document.getElementById('userDeptId');
+                if (res.code === 200 && res.data) {
+                    select.innerHTML = res.data.map(d => `<option value="${d.id}">${d.deptName}</option>`).join('');
+                }
+            });
+        }
+        
+        function showUserModal() {
+            document.getElementById('userModalTitle').textContent = '新增员工';
+            document.getElementById('userId').value = '';
+            document.getElementById('userUsername').value = '';
+            document.getElementById('userPassword').value = '';
+            document.getElementById('userRealName').value = '';
+            document.getElementById('userGender').value = '1';
+            document.getElementById('userPosition').value = '';
+            document.getElementById('userRole').value = '1';
+            document.getElementById('userPhone').value = '';
+            document.getElementById('userEmail').value = '';
+            document.getElementById('userEntryDate').value = '';
+            document.getElementById('userModal').classList.add('show');
+        }
+        
+        function closeUserModal() { document.getElementById('userModal').classList.remove('show'); }
+        
+        function saveUser() {
+            const id = document.getElementById('userId').value;
+            const data = {
+                username: document.getElementById('userUsername').value,
+                password: document.getElementById('userPassword').value,
+                realName: document.getElementById('userRealName').value,
+                gender: parseInt(document.getElementById('userGender').value),
+                deptId: parseInt(document.getElementById('userDeptId').value),
+                position: document.getElementById('userPosition').value,
+                role: parseInt(document.getElementById('userRole').value),
+                phone: document.getElementById('userPhone').value,
+                email: document.getElementById('userEmail').value,
+                entryDate: document.getElementById('userEntryDate').value
+            };
+            
+            if (!data.username || !data.realName) {
+                showMessage('请填写必要信息', 'warning');
+                return;
+            }
+            
+            const url = id ? '/user/update' : '/user/add';
+            const method = id ? 'put' : 'post';
+            if (id) data.id = parseInt(id);
+            if (!id && !data.password) {
+                showMessage('请设置密码', 'warning');
+                return;
+            }
+            
+            const promise = method === 'post' ? apiPost(url, data) : apiPut(url, data);
+            promise.then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) {
+                    closeUserModal();
+                    loadUserData();
+                }
+            });
+        }
+        
+        function editUser(id) {
+            apiGet(`/user/${id}`).then(res => {
+                if (res.code === 200) {
+                    const u = res.data;
+                    document.getElementById('userModalTitle').textContent = '编辑员工';
+                    document.getElementById('userId').value = u.id;
+                    document.getElementById('userUsername').value = u.username;
+                    document.getElementById('userPassword').value = '';
+                    document.getElementById('userRealName').value = u.realName;
+                    document.getElementById('userGender').value = u.gender;
+                    document.getElementById('userDeptId').value = u.deptId;
+                    document.getElementById('userPosition').value = u.position || '';
+                    document.getElementById('userRole').value = u.role;
+                    document.getElementById('userPhone').value = u.phone || '';
+                    document.getElementById('userEmail').value = u.email || '';
+                    document.getElementById('userEntryDate').value = u.entryDate ? formatDate(u.entryDate) : '';
+                    document.getElementById('userModal').classList.add('show');
+                }
+            });
+        }
+        
+        function deleteUser(id) {
+            if (!confirmAction('确定要删除该员工吗？')) return;
+            apiDelete(`/user/${id}`).then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) loadUserData();
+            });
+        }
+
+        // ===== 部门管理页面 =====
+        function renderDeptPage(container) {
+            container.innerHTML = `
+                <h2 class="page-title">部门管理</h2>
+                <p class="page-desc">管理公司组织架构</p>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>部门列表</h3>
+                        <button class="btn btn-primary btn-sm" onclick="showDeptModal()">+ 新增部门</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>序号</th>
+                                        <th>部门编号</th>
+                                        <th>部门名称</th>
+                                        <th>负责人</th>
+                                        <th>联系电话</th>
+                                        <th>描述</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="deptTableBody">
+                                    <tr><td colspan="7"><div class="empty-state"><p>加载中...</p></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-overlay" id="deptModal">
+                    <div class="modal" style="width:500px;">
+                        <div class="modal-header">
+                            <h3 id="deptModalTitle">新增部门</h3>
+                            <button class="modal-close" onclick="closeDeptModal()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" id="deptId">
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>部门名称 <span class="required">*</span></label>
+                                    <input type="text" id="deptName" placeholder="请输入部门名称">
+                                </div>
+                                <div class="form-item">
+                                    <label>部门编号 <span class="required">*</span></label>
+                                    <input type="text" id="deptCode" placeholder="如：TECH001">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>负责人</label>
+                                    <input type="text" id="deptManager" placeholder="请输入负责人姓名">
+                                </div>
+                                <div class="form-item">
+                                    <label>联系电话</label>
+                                    <input type="text" id="deptPhone" placeholder="请输入联系电话">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>部门描述</label>
+                                    <textarea id="deptDesc" placeholder="请输入部门描述"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-outline" onclick="closeDeptModal()">取消</button>
+                            <button class="btn btn-primary" onclick="saveDept()">保存</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            loadDeptData();
+        }
+        
+        function loadDeptData() {
+            apiGet('/dept/listAll').then(res => {
+                const tbody = document.getElementById('deptTableBody');
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    tbody.innerHTML = res.data.map((d, i) => `
+                        <tr>
+                            <td>${i+1}</td>
+                            <td>${d.deptCode}</td>
+                            <td>${d.deptName}</td>
+                            <td>${d.manager || '-'}</td>
+                            <td>${d.phone || '-'}</td>
+                            <td>${d.description || '-'}</td>
+                            <td>
+                                <button class="btn btn-outline btn-sm" onclick="editDept(${d.id})">编辑</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteDept(${d.id})">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>暂无部门数据</p></div></td></tr>';
+                }
+            });
+        }
+        
+        function showDeptModal() {
+            document.getElementById('deptModalTitle').textContent = '新增部门';
+            document.getElementById('deptId').value = '';
+            document.getElementById('deptName').value = '';
+            document.getElementById('deptCode').value = '';
+            document.getElementById('deptManager').value = '';
+            document.getElementById('deptPhone').value = '';
+            document.getElementById('deptDesc').value = '';
+            document.getElementById('deptModal').classList.add('show');
+        }
+        function closeDeptModal() { document.getElementById('deptModal').classList.remove('show'); }
+        
+        function saveDept() {
+            const id = document.getElementById('deptId').value;
+            const data = {
+                deptName: document.getElementById('deptName').value,
+                deptCode: document.getElementById('deptCode').value,
+                manager: document.getElementById('deptManager').value,
+                phone: document.getElementById('deptPhone').value,
+                description: document.getElementById('deptDesc').value
+            };
+            if (!data.deptName || !data.deptCode) {
+                showMessage('请填写必要信息', 'warning');
+                return;
+            }
+            if (id) data.id = parseInt(id);
+            
+            const promise = id ? apiPut('/dept/update', data) : apiPost('/dept/add', data);
+            promise.then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) { closeDeptModal(); loadDeptData(); }
+            });
+        }
+        
+        function editDept(id) {
+            apiGet(`/dept/${id}`).then(res => {
+                if (res.code === 200) {
+                    const d = res.data;
+                    document.getElementById('deptModalTitle').textContent = '编辑部门';
+                    document.getElementById('deptId').value = d.id;
+                    document.getElementById('deptName').value = d.deptName;
+                    document.getElementById('deptCode').value = d.deptCode;
+                    document.getElementById('deptManager').value = d.manager || '';
+                    document.getElementById('deptPhone').value = d.phone || '';
+                    document.getElementById('deptDesc').value = d.description || '';
+                    document.getElementById('deptModal').classList.add('show');
+                }
+            });
+        }
+        
+        function deleteDept(id) {
+            if (!confirmAction('确定要删除该部门吗？')) return;
+            apiDelete(`/dept/${id}`).then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) loadDeptData();
+            });
+        }
+
+        // ===== 公告页面 =====
+        function renderAnnouncementPage(container) {
+            const user = getCurrentUser();
+            container.innerHTML = `
+                <h2 class="page-title">公告通知</h2>
+                <p class="page-desc">查看公司公告与通知</p>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>公告列表</h3>
+                        ${user.role >= 2 ? '<button class="btn btn-primary btn-sm" onclick="showAnnounceModal()">+ 发布公告</button>' : ''}
+                    </div>
+                    <div class="card-body" id="announceList">
+                        <p style="color:#999;text-align:center;padding:20px;">加载中...</p>
+                    </div>
+                </div>
+                
+                <div class="modal-overlay" id="announceModal">
+                    <div class="modal" style="width:600px;">
+                        <div class="modal-header">
+                            <h3>发布公告</h3>
+                            <button class="modal-close" onclick="closeAnnounceModal()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>标题 <span class="required">*</span></label>
+                                    <input type="text" id="announceTitle" placeholder="请输入公告标题">
+                                </div>
+                                <div class="form-item" style="max-width:200px;">
+                                    <label>类型</label>
+                                    <select id="announceType">
+                                        <option value="1">通知</option>
+                                        <option value="2">公告</option>
+                                        <option value="3">制度</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label>内容 <span class="required">*</span></label>
+                                    <textarea id="announceContent" style="height:200px;" placeholder="请输入公告内容"></textarea>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-item">
+                                    <label><input type="checkbox" id="announceTop"> 置顶</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-outline" onclick="closeAnnounceModal()">取消</button>
+                            <button class="btn btn-primary" onclick="publishAnnounce()">发布</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            loadAnnounceData();
+        }
+        
+        function loadAnnounceData() {
+            apiGet('/announcement/list').then(res => {
+                const el = document.getElementById('announceList');
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    el.innerHTML = `<ul class="announce-list">${res.data.map(a => {
+                        const typeClass = a.type === 1 ? 'type-notice' : a.type === 2 ? 'type-announce' : 'type-policy';
+                        return `
+                            <li class="announce-item">
+                                <span class="type-badge ${typeClass}">${getAnnounceTypeText(a.type)}</span>
+                                ${a.isTop ? '<span class="top-tag">置顶</span>' : ''}
+                                <div class="announce-content">
+                                    <div class="announce-title">${a.title}</div>
+                                    <div class="announce-meta">${a.publisherName || '管理员'} · ${formatDate(a.createTime)}</div>
+                                </div>
+                            </li>
+                        `;
+                    }).join('')}</ul>`;
+                } else {
+                    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📢</div><p>暂无公告</p></div>';
+                }
+            });
+        }
+        
+        function showAnnounceModal() { document.getElementById('announceModal').classList.add('show'); }
+        function closeAnnounceModal() { document.getElementById('announceModal').classList.remove('show'); }
+        
+        function publishAnnounce() {
+            const data = {
+                title: document.getElementById('announceTitle').value,
+                content: document.getElementById('announceContent').value,
+                type: parseInt(document.getElementById('announceType').value),
+                isTop: document.getElementById('announceTop').checked ? 1 : 0
+            };
+            if (!data.title || !data.content) {
+                showMessage('请填写完整信息', 'warning');
+                return;
+            }
+            apiPost('/announcement/publish', data).then(res => {
+                showMessage(res.msg, res.code === 200 ? 'success' : 'error');
+                if (res.code === 200) { closeAnnounceModal(); loadAnnounceData(); }
+            });
+        }
+
+        // ===== 统计分析页面 =====
+        function renderStatisticsPage(container) {
+            container.innerHTML = `
+                <h2 class="page-title">统计分析</h2>
+                <p class="page-desc">考勤数据统计与分析</p>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>部门考勤统计</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="search-bar">
+                            <div class="search-item">
+                                <label>开始日期</label>
+                                <input type="date" id="statsStartDate">
+                            </div>
+                            <div class="search-item">
+                                <label>结束日期</label>
+                                <input type="date" id="statsEndDate">
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="loadDeptStats()">查询统计</button>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>部门</th>
+                                        <th>总记录数</th>
+                                        <th>正常出勤</th>
+                                        <th>迟到次数</th>
+                                        <th>出勤率</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="statsTableBody">
+                                    <tr><td colspan="5"><div class="empty-state"><p>请选择日期范围后查询</p></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function loadDeptStats() {
+            const start = document.getElementById('statsStartDate').value;
+            const end = document.getElementById('statsEndDate').value;
+            if (!start || !end) {
+                showMessage('请选择日期范围', 'warning');
+                return;
+            }
+            apiGet(`/attendance/deptStats?startDate=${start}&endDate=${end}`).then(res => {
+                const tbody = document.getElementById('statsTableBody');
+                if (res.code === 200 && res.data && res.data.length > 0) {
+                    tbody.innerHTML = res.data.map(s => {
+                        const rate = s.totalRecords > 0 ? ((s.normalCount / s.totalRecords) * 100).toFixed(1) : 0;
+                        return `
+                            <tr>
+                                <td><strong>${s.dept_name || '未知部门'}</strong></td>
+                                <td>${s.totalRecords}</td>
+                                <td>${s.normalCount}</td>
+                                <td>${s.lateCount}</td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <div style="flex:1;height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden;">
+                                            <div style="width:${rate}%;height:100%;background:${rate >= 90 ? '#27ae60' : rate >= 70 ? '#f39c12' : '#e74c3c'};border-radius:4px;"></div>
+                                        </div>
+                                        <span style="font-weight:600;color:${rate >= 90 ? '#27ae60' : rate >= 70 ? '#f39c12' : '#e74c3c'};">${rate}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>暂无统计数据</p></div></td></tr>';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
